@@ -1,7 +1,7 @@
 # bot.py
 # ==========================================
 # BOT TOKEN (уже вставлен)
-BOT_TOKEN = "8293227144:AAGJyjIkhCPMo5025N2w_d5OvmRN8r4qS3U"
+BOT_TOKEN = "8293227144:AAHyO0mIOa_-D-_cPhBDyQMwp7ZjJMFX5ew"
 
 # CHAT ID закрытого служебного чата модерации
 ADMIN_CHAT_ID = -1003893402238
