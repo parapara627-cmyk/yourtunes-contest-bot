@@ -4,7 +4,7 @@
 BOT_TOKEN = "8293227144:AAGJyjIkhCPMo5025N2w_d5OvmRN8r4qS3U"
 
 # CHAT ID закрытого служебного чата модерации
-ADMIN_CHAT_ID = -5209608593
+ADMIN_CHAT_ID = -1003893402238
 # ==========================================
 
 import asyncio
