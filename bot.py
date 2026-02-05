@@ -12,19 +12,12 @@ from google.oauth2.service_account import Credentials
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 
-
 logging.basicConfig(level=logging.INFO)
-
 
 # ---------- GOOGLE SHEETS ----------
 def add_to_sheet(liga, genre, username, link):
@@ -32,15 +25,9 @@ def add_to_sheet(liga, genre, username, link):
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-
-    creds = Credentials.from_service_account_file(
-        "credentials.json",
-        scopes=scope
-    )
-
+    creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open("yourtunes contest").sheet1
-
     sheet.append_row([
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         liga,
@@ -48,7 +35,7 @@ def add_to_sheet(liga, genre, username, link):
         username,
         link
     ])
-
+    logging.info(f"Добавлено в Google Sheets: {liga}, {genre}, {username}, {link}")
 
 # ---------- FSM ----------
 class SubmitForm(StatesGroup):
@@ -56,35 +43,25 @@ class SubmitForm(StatesGroup):
     choose_genre = State()
     wait_link = State()
 
-
 # ---------- Keyboards ----------
 def kb_start():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Подать трек", callback_data="submit_track")]
-        ]
-    )
-
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Подать трек", callback_data="submit_track")]
+    ])
 
 def kb_league():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="ЛИГА ЖАНРОВ", callback_data="league:GENRES")],
-            [InlineKeyboardButton(text="AI ЛИГА", callback_data="league:AI")],
-        ]
-    )
-
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="ЛИГА ЖАНРОВ", callback_data="league:GENRES")],
+        [InlineKeyboardButton(text="AI ЛИГА", callback_data="league:AI")]
+    ])
 
 def kb_genre():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Рэп", callback_data="genre:Рэп")],
-            [InlineKeyboardButton(text="Рок", callback_data="genre:Рок")],
-            [InlineKeyboardButton(text="Поп", callback_data="genre:Поп")],
-            [InlineKeyboardButton(text="Электронная", callback_data="genre:Электронная")],
-        ]
-    )
-
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Рэп", callback_data="genre:Рэп")],
+        [InlineKeyboardButton(text="Рок", callback_data="genre:Рок")],
+        [InlineKeyboardButton(text="Поп", callback_data="genre:Поп")],
+        [InlineKeyboardButton(text="Электронная", callback_data="genre:Электронная")]
+    ])
 
 # ---------- Texts ----------
 START_TEXT = (
@@ -99,19 +76,16 @@ ASK_LINK_TEXT = (
     "официально выпущенные через сервис дистрибуции yourtunēs."
 )
 
-
 # ---------- Handlers ----------
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(START_TEXT, reply_markup=kb_start())
-
 
 async def submit_track(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
     await state.set_state(SubmitForm.choose_league)
     await call.message.answer("Выбери лигу", reply_markup=kb_league())
-
 
 async def choose_league(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -126,22 +100,24 @@ async def choose_league(call: CallbackQuery, state: FSMContext):
         await state.set_state(SubmitForm.wait_link)
         await call.message.answer(ASK_LINK_TEXT)
 
-
 async def choose_genre(call: CallbackQuery, state: FSMContext):
     await call.answer()
     genre = call.data.split(":")[1]
-
     await state.update_data(genre=genre)
     await state.set_state(SubmitForm.wait_link)
     await call.message.answer(ASK_LINK_TEXT)
 
-
 async def receive_link(message: Message, state: FSMContext):
-    data = await state.get_data()
+    if not message.text:
+        await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
+        return
 
+    data = await state.get_data()
     league = data.get("league", "—")
     genre = data.get("genre") or "—"
     username = f"@{message.from_user.username}" if message.from_user.username else "—"
+
+    logging.info(f"Получена ссылка от {username}: {message.text}")
 
     # запись в Google Sheets
     add_to_sheet(
@@ -154,11 +130,6 @@ async def receive_link(message: Message, state: FSMContext):
     await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
     await state.clear()
 
-
-async def not_text(message: Message):
-    await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
-
-
 # ---------- Run ----------
 async def main():
     bot = Bot(token=BOT_TOKEN)
@@ -168,11 +139,10 @@ async def main():
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
     dp.callback_query.register(choose_genre, F.data.startswith("genre:"), SubmitForm.choose_genre)
-    dp.message.register(receive_link, SubmitForm.wait_link, F.text)
-    dp.message.register(not_text, SubmitForm.wait_link)
+    dp.message.register(receive_link, SubmitForm.wait_link)  # ловим любые сообщения в состоянии wait_link
 
+    logging.info("Бот запущен...")
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
