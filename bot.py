@@ -1,14 +1,14 @@
 # bot.py
 # ==========================================
-# BOT TOKEN (уже вставлен)
 BOT_TOKEN = "8293227144:AAHyO0mIOa_-D-_cPhBDyQMwp7ZjJMFX5ew"
-
-# CHAT ID закрытого служебного чата модерации
-ADMIN_CHAT_ID = -1003893402238
 # ==========================================
 
 import asyncio
 import logging
+from datetime import datetime
+
+import gspread
+from google.oauth2.service_account import Credentials
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
@@ -24,6 +24,30 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 
 logging.basicConfig(level=logging.INFO)
+
+
+# ---------- GOOGLE SHEETS ----------
+def add_to_sheet(liga, genre, username, link):
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    creds = Credentials.from_service_account_file(
+        "credentials.json",
+        scopes=scope
+    )
+
+    client = gspread.authorize(creds)
+    sheet = client.open("yourtunes contest").sheet1
+
+    sheet.append_row([
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        liga,
+        genre,
+        username,
+        link
+    ])
 
 
 # ---------- FSM ----------
@@ -112,23 +136,21 @@ async def choose_genre(call: CallbackQuery, state: FSMContext):
     await call.message.answer(ASK_LINK_TEXT)
 
 
-async def receive_link(message: Message, state: FSMContext, bot: Bot):
+async def receive_link(message: Message, state: FSMContext):
     data = await state.get_data()
 
     league = data.get("league", "—")
     genre = data.get("genre") or "—"
     username = f"@{message.from_user.username}" if message.from_user.username else "—"
 
-    admin_text = (
-        "yourtunēs CONTEST — Заявка\n\n"
-        f"Лига: {league}\n"
-        f"Жанр: {genre}\n"
-        f"Пользователь: {username}\n\n"
-        "Ссылка:\n"
-        f"{message.text}"
+    # запись в Google Sheets
+    add_to_sheet(
+        league,
+        genre,
+        username,
+        message.text
     )
 
-    await bot.send_message(ADMIN_CHAT_ID, admin_text)
     await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
     await state.clear()
 
