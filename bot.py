@@ -13,6 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 
+
 # ---------- GOOGLE SHEETS ----------
 def add_to_sheet(liga, genre, username, link):
     creds = Credentials.from_service_account_file(
@@ -22,8 +23,10 @@ def add_to_sheet(liga, genre, username, link):
             "https://www.googleapis.com/auth/drive"
         ]
     )
+
     client = gspread.authorize(creds)
     sheet = client.open("yourtunes contest").sheet1
+
     sheet.append_row([
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         liga,
@@ -32,11 +35,13 @@ def add_to_sheet(liga, genre, username, link):
         link
     ])
 
+
 # ---------- FSM ----------
 class SubmitForm(StatesGroup):
     choose_league = State()
     choose_genre = State()
     wait_link = State()
+
 
 # ---------- Keyboards ----------
 def kb_start():
@@ -44,11 +49,13 @@ def kb_start():
         [InlineKeyboardButton(text="Подать трек", callback_data="submit_track")]
     ])
 
+
 def kb_league():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="ЛИГА ЖАНРОВ", callback_data="league:GENRES")],
         [InlineKeyboardButton(text="AI ЛИГА", callback_data="league:AI")]
     ])
+
 
 def kb_genre():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -57,6 +64,7 @@ def kb_genre():
         [InlineKeyboardButton(text="Поп", callback_data="genre:Поп")],
         [InlineKeyboardButton(text="Электронная", callback_data="genre:Электронная")]
     ])
+
 
 START_TEXT = (
     "yourtunēs CONTEST\n"
@@ -70,16 +78,19 @@ ASK_LINK_TEXT = (
     "официально выпущенные через сервис дистрибуции yourtunēs."
 )
 
+
 # ---------- Handlers ----------
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(START_TEXT, reply_markup=kb_start())
+
 
 async def submit_track(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
     await state.set_state(SubmitForm.choose_league)
     await call.message.answer("Выбери лигу", reply_markup=kb_league())
+
 
 async def choose_league(call: CallbackQuery, state: FSMContext):
     await call.answer()
@@ -94,6 +105,7 @@ async def choose_league(call: CallbackQuery, state: FSMContext):
         await state.set_state(SubmitForm.wait_link)
         await call.message.answer(ASK_LINK_TEXT)
 
+
 async def choose_genre(call: CallbackQuery, state: FSMContext):
     await call.answer()
     genre = call.data.split(":")[1]
@@ -101,37 +113,35 @@ async def choose_genre(call: CallbackQuery, state: FSMContext):
     await state.set_state(SubmitForm.wait_link)
     await call.message.answer(ASK_LINK_TEXT)
 
-async def receive_link(message: Message, state: FSMContext):
-    if not message.text:
-        await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
-        return
 
+async def receive_link(message: Message, state: FSMContext):
     data = await state.get_data()
+
     league = data.get("league", "—")
     genre = data.get("genre") or "—"
     username = f"@{message.from_user.username}" if message.from_user.username else "—"
 
-    # записываем в Google Sheets
     add_to_sheet(league, genre, username, message.text)
 
     await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
     await state.clear()
+
 
 # ---------- Run ----------
 async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # команды
     dp.message.register(cmd_start, CommandStart())
-    # кнопки
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
     dp.callback_query.register(choose_genre, F.data.startswith("genre:"), SubmitForm.choose_genre)
-    # ссылка
-    dp.message.register(receive_link, SubmitForm.wait_link, F.text.exists())
+
+    # ← ВОТ ИСПРАВЛЕННАЯ РЕГИСТРАЦИЯ
+    dp.message.register(receive_link, SubmitForm.wait_link)
 
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
