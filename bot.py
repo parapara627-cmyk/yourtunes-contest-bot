@@ -15,9 +15,14 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 
 # ---------- GOOGLE SHEETS ----------
+import os
+import json
+
 def add_to_sheet(liga, genre, username, link):
-    creds = Credentials.from_service_account_file(
-        "credentials.json",
+    creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
+
+    creds = Credentials.from_service_account_info(
+        creds_dict,
         scopes=[
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
@@ -34,7 +39,6 @@ def add_to_sheet(liga, genre, username, link):
         username,
         link
     ])
-
 
 # ---------- FSM ----------
 class SubmitForm(StatesGroup):
