@@ -1,12 +1,8 @@
 # bot.py
-# ==========================================
 BOT_TOKEN = "8293227144:AAHyO0mIOa_-D-_cPhBDyQMwp7ZjJMFX5ew"
-# ==========================================
 
 import asyncio
-import logging
 from datetime import datetime
-
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -17,15 +13,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 
-logging.basicConfig(level=logging.INFO)
-
 # ---------- GOOGLE SHEETS ----------
 def add_to_sheet(liga, genre, username, link):
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+    creds = Credentials.from_service_account_file(
+        "credentials.json",
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+    )
     client = gspread.authorize(creds)
     sheet = client.open("yourtunes contest").sheet1
     sheet.append_row([
@@ -35,7 +31,6 @@ def add_to_sheet(liga, genre, username, link):
         username,
         link
     ])
-    logging.info(f"Добавлено в Google Sheets: {liga}, {genre}, {username}, {link}")
 
 # ---------- FSM ----------
 class SubmitForm(StatesGroup):
@@ -63,7 +58,6 @@ def kb_genre():
         [InlineKeyboardButton(text="Электронная", callback_data="genre:Электронная")]
     ])
 
-# ---------- Texts ----------
 START_TEXT = (
     "yourtunēs CONTEST\n"
     "Онлайн музыкальный конкурс.\n"
@@ -117,15 +111,8 @@ async def receive_link(message: Message, state: FSMContext):
     genre = data.get("genre") or "—"
     username = f"@{message.from_user.username}" if message.from_user.username else "—"
 
-    logging.info(f"Получена ссылка от {username}: {message.text}")
-
-    # запись в Google Sheets
-    add_to_sheet(
-        league,
-        genre,
-        username,
-        message.text
-    )
+    # записываем в Google Sheets
+    add_to_sheet(league, genre, username, message.text)
 
     await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
     await state.clear()
@@ -135,13 +122,15 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
+    # команды
     dp.message.register(cmd_start, CommandStart())
+    # кнопки
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
     dp.callback_query.register(choose_genre, F.data.startswith("genre:"), SubmitForm.choose_genre)
-    dp.message.register(receive_link, SubmitForm.wait_link)  # ловим любые сообщения в состоянии wait_link
+    # ссылка
+    dp.message.register(receive_link, SubmitForm.wait_link, F.text.exists())
 
-    logging.info("Бот запущен...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
