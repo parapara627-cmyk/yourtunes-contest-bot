@@ -188,7 +188,6 @@ bot = Bot(
     default=DefaultBotProperties(parse_mode="HTML")
 )
     dp = Dispatcher(storage=MemoryStorage())
-
     dp.message.register(cmd_start, CommandStart())
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
