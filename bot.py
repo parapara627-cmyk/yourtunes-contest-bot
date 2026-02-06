@@ -5,7 +5,6 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime
 
-
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -18,11 +17,17 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
 
+# =========================
+# ENV
+# =========================
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 SHEET_NAME = os.environ.get("SHEET_NAME", "yourtunes contest")
+GOOGLE_CREDENTIALS = os.environ["GOOGLE_CREDENTIALS"]
 
 
-# --- Link validation ---
+# =========================
+# Link validation
+# =========================
 ALLOWED_DOMAINS = {
     "yourtunes.net",
     "www.yourtunes.net",
@@ -30,9 +35,11 @@ ALLOWED_DOMAINS = {
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
+
 def extract_first_url(text: str):
     m = URL_RE.search(text or "")
     return m.group(0) if m else None
+
 
 def is_allowed_url(url: str) -> bool:
     try:
@@ -42,8 +49,11 @@ def is_allowed_url(url: str) -> bool:
         return False
 
 
+# =========================
+# Google Sheets
+# =========================
 def add_to_sheet(liga: str, genre: str, username: str, link: str):
-    creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
+    creds_dict = json.loads(GOOGLE_CREDENTIALS)
 
     creds = Credentials.from_service_account_info(
         creds_dict,
@@ -65,12 +75,18 @@ def add_to_sheet(liga: str, genre: str, username: str, link: str):
     ])
 
 
+# =========================
+# FSM
+# =========================
 class SubmitForm(StatesGroup):
     choose_league = State()
     choose_genre = State()
     wait_link = State()
 
 
+# =========================
+# Keyboards
+# =========================
 def kb_start():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Подать трек", callback_data="submit_track")]
@@ -93,6 +109,9 @@ def kb_genre():
     ])
 
 
+# =========================
+# Texts (HTML)
+# =========================
 START_TEXT = (
     "<b>yourtunēs CONTEST</b>\n"
     "<i>Музыкальный онлайн конкурс.</i>\n"
@@ -102,7 +121,7 @@ START_TEXT = (
 ASK_LINK_TEXT = (
     "Отправь мультссылку на релиз одним сообщением.\n\n"
     "⚠️ Внимание: принимаются только треки,\n"
-    "официально выпущенные через сервис дистрибуции yourtunēs и ссылки на релиз созданные в личном кабинете."
+    "официально выпущенные через сервис дистрибуции yourtunēs и ссылки на релиз, созданные в личном кабинете."
 )
 
 OK_TEXT = (
@@ -112,12 +131,16 @@ OK_TEXT = (
 )
 
 NOT_OK_TEXT = (
-    "<b>⚠️ Эта ссылка не подходит.</b\n\n"
-    "Принимаются только мультссылки на релизы, созданные через личный кабинет yourtunēs.\n\n"
-    "Отправь мультссылку yourtunēs одним сообщением. Подробнее о том как создать мультиссылку читайте тут https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes "
+    "<b>⚠️ Эта ссылка не подходит.</b>\n\n"
+    "Принимаются только мультиссылки на релизы, созданные через личный кабинет yourtunēs.\n\n"
+    "Узнать подробнее вы можете по ссылке:\n"
+    "https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes"
 )
 
 
+# =========================
+# Handlers
+# =========================
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(START_TEXT, reply_markup=kb_start())
@@ -180,14 +203,17 @@ async def receive_link(message: Message, state: FSMContext):
     await state.clear()
 
 
+# =========================
+# Run
+# =========================
 async def main():
-    from aiogram.client.default import DefaultBotProperties
+    bot = Bot(
+        token=BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode="HTML"),
+    )
 
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode="HTML")
-)
     dp = Dispatcher(storage=MemoryStorage())
+
     dp.message.register(cmd_start, CommandStart())
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
