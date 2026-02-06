@@ -1,6 +1,8 @@
 import asyncio
 import os
 import json
+import re
+from urllib.parse import urlparse
 from datetime import datetime
 
 import gspread
@@ -16,6 +18,26 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 SHEET_NAME = os.environ.get("SHEET_NAME", "yourtunes contest")
+
+
+# --- Link validation ---
+ALLOWED_DOMAINS = {
+    "yourtunes.net",
+    "www.yourtunes.net",
+}
+
+URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+def extract_first_url(text: str):
+    m = URL_RE.search(text or "")
+    return m.group(0) if m else None
+
+def is_allowed_url(url: str) -> bool:
+    try:
+        host = urlparse(url).netloc.lower().split(":")[0]
+        return host in ALLOWED_DOMAINS
+    except Exception:
+        return False
 
 
 def add_to_sheet(liga: str, genre: str, username: str, link: str):
@@ -81,6 +103,18 @@ ASK_LINK_TEXT = (
     "официально выпущенные через сервис дистрибуции yourtunēs."
 )
 
+OK_TEXT = (
+    "✅ Заявка принята.\n\n"
+    "Релиз будет проверен на соответствие условиям конкурса. После формирования списка участников пройдёт отборочный раунд.\n\n"
+    "Актуальную информацию о ходе конкурса читайте в канале @YOURTUNES1"
+)
+
+NOT_OK_TEXT = (
+    "⚠️ Эта ссылка не подходит.\n\n"
+    "Принимаются только мультссылки на релизы, созданные через личный кабинет yourtunēs.\n\n"
+    "Отправь мультссылку yourtunēs одним сообщением."
+)
+
 
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
@@ -121,14 +155,23 @@ async def receive_link(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
         return
 
+    url = extract_first_url(message.text)
+    if not url:
+        await message.answer("Пришли ссылку одним сообщением (полный URL, начиная с http/https).")
+        return
+
+    if not is_allowed_url(url):
+        await message.answer(NOT_OK_TEXT)
+        return
+
     data = await state.get_data()
     league = data.get("league", "—")
     genre = data.get("genre") or "—"
     username = f"@{message.from_user.username}" if message.from_user.username else "—"
 
     try:
-        add_to_sheet(league, genre, username, message.text)
-        await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
+        add_to_sheet(league, genre, username, url)
+        await message.answer(OK_TEXT)
     except Exception as e:
         await message.answer(f"Ошибка записи в таблицу. Сообщи администратору.\n\nТехнически: {e}")
 
