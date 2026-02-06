@@ -1,8 +1,8 @@
-# bot.py
-BOT_TOKEN = "8293227144:AAHyO0mIOa_-D-_cPhBDyQMwp7ZjJMFX5ew"
-
 import asyncio
+import os
+import json
 from datetime import datetime
+
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -14,40 +14,39 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
 
 
-# ---------- GOOGLE SHEETS ----------
-import os
-import json
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+SHEET_NAME = os.environ.get("SHEET_NAME", "yourtunes contest")
 
-def add_to_sheet(liga, genre, username, link):
+
+def add_to_sheet(liga: str, genre: str, username: str, link: str):
     creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
 
     creds = Credentials.from_service_account_info(
         creds_dict,
         scopes=[
             "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
+            "https://www.googleapis.com/auth/drive",
+        ],
     )
 
     client = gspread.authorize(creds)
-    sheet = client.open("yourtunes contest").sheet1
+    sheet = client.open(SHEET_NAME).sheet1
 
     sheet.append_row([
         datetime.now().strftime("%Y-%m-%d %H:%M"),
         liga,
         genre,
         username,
-        link
+        link,
     ])
 
-# ---------- FSM ----------
+
 class SubmitForm(StatesGroup):
     choose_league = State()
     choose_genre = State()
     wait_link = State()
 
 
-# ---------- Keyboards ----------
 def kb_start():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Подать трек", callback_data="submit_track")]
@@ -83,7 +82,6 @@ ASK_LINK_TEXT = (
 )
 
 
-# ---------- Handlers ----------
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(START_TEXT, reply_markup=kb_start())
@@ -119,19 +117,24 @@ async def choose_genre(call: CallbackQuery, state: FSMContext):
 
 
 async def receive_link(message: Message, state: FSMContext):
-    data = await state.get_data()
+    if not message.text:
+        await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
+        return
 
+    data = await state.get_data()
     league = data.get("league", "—")
     genre = data.get("genre") or "—"
     username = f"@{message.from_user.username}" if message.from_user.username else "—"
 
-    add_to_sheet(league, genre, username, message.text)
+    try:
+        add_to_sheet(league, genre, username, message.text)
+        await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
+    except Exception as e:
+        await message.answer(f"Ошибка записи в таблицу. Сообщи администратору.\n\nТехнически: {e}")
 
-    await message.answer("Заявка принята. Спасибо за участие в yourtunēs CONTEST.")
     await state.clear()
 
 
-# ---------- Run ----------
 async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
@@ -140,8 +143,6 @@ async def main():
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
     dp.callback_query.register(choose_genre, F.data.startswith("genre:"), SubmitForm.choose_genre)
-
-    # ← ВОТ ИСПРАВЛЕННАЯ РЕГИСТРАЦИЯ
     dp.message.register(receive_link, SubmitForm.wait_link)
 
     await dp.start_polling(bot)
