@@ -5,6 +5,7 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime
 
+
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -14,6 +15,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.default import DefaultBotProperties
 
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
@@ -92,8 +94,8 @@ def kb_genre():
 
 
 START_TEXT = (
-    "yourtunēs CONTEST\n"
-    "Музыкальный онлайн конкурс.\n"
+    "<b>yourtunēs CONTEST</b>\n"
+    "<i>Музыкальный онлайн конкурс.</i>\n"
     "Нажми кнопку, чтобы подать трек."
 )
 
@@ -104,16 +106,15 @@ ASK_LINK_TEXT = (
 )
 
 OK_TEXT = (
-    "✅ Заявка принята.\n\n"
+    "<b>✅ Заявка принята.</b>\n\n"
     "Релиз будет проверен на соответствие условиям конкурса. После формирования списка участников пройдёт отборочный раунд.\n\n"
     "Актуальную информацию о ходе конкурса читайте в канале @YOURTUNES1"
 )
 
 NOT_OK_TEXT = (
-    "⚠️ Эта ссылка не подходит.\n\n"
+    "<b>⚠️ Эта ссылка не подходит.</b\n\n"
     "Принимаются только мультссылки на релизы, созданные через личный кабинет yourtunēs.\n\n"
-    "Отправь мультссылку yourtunēs одним сообщением."
-    "Подробнее о том как создать мультиссылку читайте тут https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes"
+    "Отправь мультссылку yourtunēs одним сообщением. Подробнее о том как создать мультиссылку читайте тут https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes "
 )
 
 
@@ -180,7 +181,12 @@ async def receive_link(message: Message, state: FSMContext):
 
 
 async def main():
-    bot = Bot(token=BOT_TOKEN)
+    from aiogram.client.default import DefaultBotProperties
+
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode="HTML")
+)
     dp = Dispatcher(storage=MemoryStorage())
 
     dp.message.register(cmd_start, CommandStart())
