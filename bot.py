@@ -133,7 +133,7 @@ OK_TEXT = (
 NOT_OK_TEXT = (
     "<b>⚠️ Эта ссылка не подходит.</b>\n\n"
     "Принимаются только мультиссылки на релизы, созданные через личный кабинет yourtunēs.\n\n"
-    "Узнать подробнее вы можете по ссылке:\n"
+    "Подробнее о том как её создать читайте по ссылке:\n"
     "https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes"
 )
 
