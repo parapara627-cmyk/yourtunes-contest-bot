@@ -123,20 +123,22 @@ ASK_LINK_TEXT = (
     "⚠️ Внимание: принимаются только треки,\n"
     "официально выпущенные через сервис дистрибуции yourtunēs и мультиссылки на релиз, созданные в личном кабинете.\n\n"
     "Подробнее о том, как создать мультиссылку:\n"
-    '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">Инструкция</a>'
+    '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">FAQ</a>'
 )
 
 OK_TEXT = (
     "<b>✅ Заявка принята.</b>\n\n"
     "Релиз будет проверен на соответствие условиям конкурса. После формирования списка участников пройдёт отборочный раунд.\n\n"
     "Актуальную информацию о ходе конкурса читайте в канале @YOURTUNES1"
+    "<i>Чтобы начать заново, напишите /start</i>"
 )
 
 NOT_OK_TEXT = (
     "<b>⚠️ Эта ссылка не подходит.</b>\n\n"
     "Принимаются только мультиссылки на релизы, созданные через личный кабинет yourtunēs.\n\n"
     "Подробнее о том как её создать читайте по ссылке:\n"
-    "https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes"
+      '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">FAQ</a>'
+    "<i>Чтобы начать заново, напишите /start</i>"
 )
 
 
