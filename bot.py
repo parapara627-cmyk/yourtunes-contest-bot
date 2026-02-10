@@ -140,7 +140,7 @@ NOT_OK_TEXT = (
     "созданные через личный кабинет yourtunēs.\n\n"
     "Подробнее о том, как её создать, читайте по ссылке: "
     '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">FAQ</a>\n\n'
-    "<i>Чтобы начать заново, напишите /start</i>"
+    "<i>Чтобы начать заново, нажмите /start</i>"
 )
 
 
