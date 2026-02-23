@@ -26,6 +26,20 @@ GOOGLE_CREDENTIALS = os.environ["GOOGLE_CREDENTIALS"]
 
 
 # =========================
+# CONTEST MODE (OPEN/CLOSED)
+# =========================
+# Когда приём снова откроется — поменяй на False
+CONTEST_CLOSED = True
+
+CONTEST_CLOSED_TEXT = (
+    "<b>Приём заявок завершён.</b>\n\n"
+    "Спасибо всем участникам конкурса yourtunēs CONTEST.\n\n"
+    "Результаты отбора будут объявлены 2 марта.\n"
+    "Актуальную информацию о ходе конкурса читайте в канале @YOURTUNES1"
+)
+
+
+# =========================
 # Link validation
 # =========================
 ALLOWED_DOMAINS = {
@@ -155,6 +169,12 @@ async def cmd_start(message: Message, state: FSMContext):
 async def submit_track(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
+
+    # Если приём закрыт — не пускаем в flow
+    if CONTEST_CLOSED:
+        await call.message.answer(CONTEST_CLOSED_TEXT)
+        return
+
     await state.set_state(SubmitForm.choose_league)
     await call.message.answer("Выбери лигу", reply_markup=kb_league())
 
@@ -182,6 +202,12 @@ async def choose_genre(call: CallbackQuery, state: FSMContext):
 
 
 async def receive_link(message: Message, state: FSMContext):
+    # Если приём закрыт — не принимаем ссылки
+    if CONTEST_CLOSED:
+        await message.answer(CONTEST_CLOSED_TEXT)
+        await state.clear()
+        return
+
     if not message.text:
         await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
         return
