@@ -276,9 +276,20 @@ def kb_round2():
 
 
 def kb_final_chat():
+    final_url = FINAL_CHAT_LINK.strip()
+
+    if not final_url:
+        raise ValueError("FINAL_CHAT_LINK is empty")
+
+    if not final_url.startswith("https://t.me/"):
+        raise ValueError("FINAL_CHAT_LINK must start with https://t.me/")
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Вступить в чат финалистов", url=FINAL_CHAT_LINK)]
+            [InlineKeyboardButton(
+                text="Вступить в чат финалистов",
+                url=final_url
+            )]
         ]
     )
 
