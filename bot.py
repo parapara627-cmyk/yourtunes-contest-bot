@@ -45,6 +45,7 @@ ADMIN_IDS = {
 APPLICATIONS_SHEET = "Заявки"
 ROUND2_INVITES_SHEET = "round2_invites"
 ROUND2_APPLICATIONS_SHEET = "Заявки_2"
+ROUND3_INVITES_SHEET = "round3_invites"
 
 
 # =========================
@@ -153,12 +154,12 @@ def get_application_sheet_for_round(round_number: int) -> str:
     return APPLICATIONS_SHEET
 
 
-def find_round2_invite_by_user_id(user_id: int):
+def find_invite_by_user_id(sheet_title: str, user_id: int):
     """
-    round2_invites:
+    Универсально для round2_invites и round3_invites:
     date | league | genre | username | link | user_id | chat_id | full_name | round | status | comment | notify_status | notify_error
     """
-    sheet = get_worksheet(ROUND2_INVITES_SHEET)
+    sheet = get_worksheet(sheet_title)
     rows = sheet.get_all_values()
 
     if len(rows) < 2:
@@ -187,8 +188,8 @@ def find_round2_invite_by_user_id(user_id: int):
     return None
 
 
-def get_round2_invites_rows():
-    sheet = get_worksheet(ROUND2_INVITES_SHEET)
+def get_invite_rows(sheet_title: str):
+    sheet = get_worksheet(sheet_title)
     rows = sheet.get_all_values()
 
     if len(rows) < 2:
@@ -216,13 +217,12 @@ def get_round2_invites_rows():
     return result
 
 
-def update_round2_notify_result(row_index: int, status: str, error_text: str = ""):
+def update_notify_result(sheet_title: str, row_index: int, status: str, error_text: str = ""):
     """
-    round2_invites:
     notify_status = колонка L (12)
     notify_error  = колонка M (13)
     """
-    sheet = get_worksheet(ROUND2_INVITES_SHEET)
+    sheet = get_worksheet(sheet_title)
     sheet.update_cell(row_index, 12, status)
     sheet.update_cell(row_index, 13, error_text)
 
@@ -271,6 +271,14 @@ def kb_round2():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Подать трек во 2-й раунд", callback_data="submit_round2")]
+        ]
+    )
+
+
+def kb_final_chat():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Вступить в чат финалистов", url=FINAL_CHAT_LINK)]
         ]
     )
 
@@ -352,6 +360,12 @@ ROUND2_DENIED_TEXT = (
     "Если ты уверен, что прошёл дальше, напиши организаторам конкурса."
 )
 
+FINAL_TEXT = (
+    "<b>Поздравляем! Ты прошёл в финал yourtunēs CONTEST.</b>\n\n"
+    "Вся информация будет публиковаться в специальном чате для финалистов.\n\n"
+    "Нажми кнопку ниже, чтобы вступить в чат."
+)
+
 ADMIN_ONLY_TEXT = "Эта команда доступна только администратору."
 
 ROUND2_SEND_DONE_TEMPLATE = (
@@ -361,11 +375,11 @@ ROUND2_SEND_DONE_TEMPLATE = (
     "Пропущено (уже отправляли): {skipped}"
 )
 
-FINAL_TEXT = (
-    "<b>Ты прошёл в финал yourtunēs CONTEST.</b>\n\n"
-    "Поздравляем.\n"
-    "Финальный этап проходит в отдельном чате.\n\n"
-    f"Ссылка на чат:\n{FINAL_CHAT_LINK}"
+FINAL_SEND_DONE_TEMPLATE = (
+    "Рассылка финалистам завершена.\n\n"
+    "Отправлено: {sent}\n"
+    "Ошибок: {failed}\n"
+    "Пропущено (уже отправляли): {skipped}"
 )
 
 
@@ -423,7 +437,7 @@ async def submit_round2(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
-    invite = find_round2_invite_by_user_id(call.from_user.id)
+    invite = find_invite_by_user_id(ROUND2_INVITES_SHEET, call.from_user.id)
     if not invite:
         await call.message.answer(ROUND2_DENIED_TEXT)
         return
@@ -497,7 +511,7 @@ async def send_round2(message: Message):
         return
 
     try:
-        invites = get_round2_invites_rows()
+        invites = get_invite_rows(ROUND2_INVITES_SHEET)
     except Exception as e:
         await message.answer(f"Не удалось прочитать лист {ROUND2_INVITES_SHEET}: {e}")
         return
@@ -521,7 +535,8 @@ async def send_round2(message: Message):
 
         if not chat_id_raw.isdigit():
             failed += 1
-            update_round2_notify_result(
+            update_notify_result(
+                sheet_title=ROUND2_INVITES_SHEET,
                 row_index=row_index,
                 status="failed",
                 error_text="invalid chat_id",
@@ -536,14 +551,16 @@ async def send_round2(message: Message):
                 text=ROUND2_TEXT,
                 reply_markup=kb_round2(),
             )
-            update_round2_notify_result(
+            update_notify_result(
+                sheet_title=ROUND2_INVITES_SHEET,
                 row_index=row_index,
                 status="sent",
                 error_text="",
             )
             sent += 1
         except Exception as e:
-            update_round2_notify_result(
+            update_notify_result(
+                sheet_title=ROUND2_INVITES_SHEET,
                 row_index=row_index,
                 status="failed",
                 error_text=str(e)[:500],
@@ -552,6 +569,77 @@ async def send_round2(message: Message):
 
     await message.answer(
         ROUND2_SEND_DONE_TEMPLATE.format(
+            sent=sent,
+            failed=failed,
+            skipped=skipped,
+        )
+    )
+
+
+async def send_final(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer(ADMIN_ONLY_TEXT)
+        return
+
+    try:
+        invites = get_invite_rows(ROUND3_INVITES_SHEET)
+    except Exception as e:
+        await message.answer(f"Не удалось прочитать лист {ROUND3_INVITES_SHEET}: {e}")
+        return
+
+    if not invites:
+        await message.answer("Лист round3_invites пуст.")
+        return
+
+    sent = 0
+    failed = 0
+    skipped = 0
+
+    for row in invites:
+        row_index = row["row_index"]
+        chat_id_raw = row["chat_id"]
+        notify_status = row["notify_status"]
+
+        if notify_status:
+            skipped += 1
+            continue
+
+        if not chat_id_raw.isdigit():
+            failed += 1
+            update_notify_result(
+                sheet_title=ROUND3_INVITES_SHEET,
+                row_index=row_index,
+                status="failed",
+                error_text="invalid chat_id",
+            )
+            continue
+
+        chat_id = int(chat_id_raw)
+
+        try:
+            await message.bot.send_message(
+                chat_id=chat_id,
+                text=FINAL_TEXT,
+                reply_markup=kb_final_chat(),
+            )
+            update_notify_result(
+                sheet_title=ROUND3_INVITES_SHEET,
+                row_index=row_index,
+                status="sent",
+                error_text="",
+            )
+            sent += 1
+        except Exception as e:
+            update_notify_result(
+                sheet_title=ROUND3_INVITES_SHEET,
+                row_index=row_index,
+                status="failed",
+                error_text=str(e)[:500],
+            )
+            failed += 1
+
+    await message.answer(
+        FINAL_SEND_DONE_TEMPLATE.format(
             sent=sent,
             failed=failed,
             skipped=skipped,
@@ -572,6 +660,7 @@ async def main():
 
     dp.message.register(cmd_start, CommandStart())
     dp.message.register(send_round2, Command("send_round2"))
+    dp.message.register(send_final, Command("send_final"))
 
     dp.callback_query.register(submit_track, F.data == "submit_track")
     dp.callback_query.register(submit_round2, F.data == "submit_round2")
