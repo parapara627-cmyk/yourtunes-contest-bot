@@ -2,7 +2,6 @@ import asyncio
 import os
 import json
 import re
-from urllib.parse import urlparse
 from datetime import datetime
 
 import gspread
@@ -24,29 +23,16 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 SHEET_NAME = os.environ.get("SHEET_NAME", "yourtunes contest")
 GOOGLE_CREDENTIALS = os.environ["GOOGLE_CREDENTIALS"]
 
+CONTEST_CLOSED = os.environ.get("CONTEST_CLOSED", "true").lower() == "true"
+CURRENT_ROUND = int(os.environ.get("CURRENT_ROUND", "1"))
 
-# =========================
-# CONTEST MODE (OPEN/CLOSED)
-# =========================
-# Когда приём снова откроется — поменяй на False
-CONTEST_CLOSED = True
-
-CONTEST_CLOSED_TEXT = (
-    "<b>Приём заявок завершён.</b>\n\n"
-    "Спасибо всем участникам конкурса yourtunēs CONTEST.\n\n"
-    "Результаты отбора будут объявлены 2 марта.\n"
-    "Актуальную информацию о ходе конкурса читайте в канале @YOURTUNES1"
-)
+CONTEST_CHANNEL = "@contest_by_yourtunes"
+APPLICATIONS_SHEET = "Заявки"
 
 
 # =========================
-# Link validation
+# Link extraction
 # =========================
-ALLOWED_DOMAINS = {
-    "yourtunes.net",
-    "www.yourtunes.net",
-}
-
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
 
@@ -55,18 +41,10 @@ def extract_first_url(text: str):
     return m.group(0) if m else None
 
 
-def is_allowed_url(url: str) -> bool:
-    try:
-        host = urlparse(url).netloc.lower().split(":")[0]
-        return host in ALLOWED_DOMAINS
-    except Exception:
-        return False
-
-
 # =========================
 # Google Sheets
 # =========================
-def add_to_sheet(liga: str, genre: str, username: str, link: str):
+def get_worksheet(sheet_title: str):
     creds_dict = json.loads(GOOGLE_CREDENTIALS)
 
     creds = Credentials.from_service_account_info(
@@ -78,14 +56,31 @@ def add_to_sheet(liga: str, genre: str, username: str, link: str):
     )
 
     client = gspread.authorize(creds)
-    sheet = client.open(SHEET_NAME).sheet1
+    spreadsheet = client.open(SHEET_NAME)
+    worksheet = spreadsheet.worksheet(sheet_title)
+    return worksheet
+
+
+def add_to_applications_sheet(liga: str, genre: str, user, link: str, round_number: int):
+    sheet = get_worksheet(APPLICATIONS_SHEET)
+
+    username = f"@{user.username}" if user.username else "—"
+    full_name = user.full_name or "—"
+
+    status = "submitted" if round_number == 1 else "submitted_r2"
 
     sheet.append_row([
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
-        liga,
-        genre,
-        username,
-        link,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),  # date
+        liga,                                       # league
+        genre,                                      # genre
+        username,                                   # username
+        link,                                       # link
+        str(user.id),                               # user_id
+        str(user.id),                               # chat_id
+        full_name,                                  # full_name
+        str(round_number),                          # round
+        status,                                     # status
+        "",                                         # comment
     ])
 
 
@@ -128,33 +123,40 @@ def kb_genre():
 # =========================
 START_TEXT = (
     "<b>yourtunēs CONTEST</b>\n"
-    "<i>Музыкальный онлайн конкурс.</i>\n"
-    "Нажми кнопку, чтобы подать трек."
+    "<i>Музыкальный онлайн-конкурс.</i>\n\n"
+    "Приём треков открыт с 7 по 20 апреля.\n"
+    "Результаты отбора будут объявлены 27 апреля.\n\n"
+    f"Все обновления публикуются в канале {CONTEST_CHANNEL}.\n\n"
+    "Нажми кнопку ниже, чтобы подать трек."
 )
 
 ASK_LINK_TEXT = (
-    "Отправь мультссылку на релиз одним сообщением.\n\n"
-    "⚠️ Внимание: принимаются только треки,\n"
-    "официально выпущенные через сервис дистрибуции yourtunēs и мультиссылки на релиз, созданные в личном кабинете.\n\n"
-    "Подробнее о том, как создать мультиссылку:\n"
-    '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">FAQ</a>'
+    "Отправь мультиссылку на релиз одним сообщением.\n\n"
+    "Важно:\n"
+    "— принимаются только мультиссылки на релиз\n"
+    "— все заявки проходят модерацию перед отбором\n\n"
+    "Если ссылка не соответствует условиям конкурса, заявка не будет допущена."
 )
 
 OK_TEXT = (
     "<b>✅ Заявка принята.</b>\n\n"
-    "Релиз будет проверен на соответствие условиям конкурса. "
-    "Результаты отбора будут объявлены 2 марта.\n\n"
-    "Актуальную информацию о ходе конкурса читайте в канале @YOURTUNES1\n\n"
+    "Трек отправлен на модерацию.\n"
+    "Результаты отбора будут опубликованы 27 апреля.\n\n"
+    f"Следите за обновлениями в канале {CONTEST_CHANNEL}.\n\n"
     "<i>Чтобы начать заново, напишите /start</i>"
 )
 
 NOT_OK_TEXT = (
-    "⚠️ <b>Эта ссылка не подходит.</b>\n\n"
-    "Принимаются только мультиссылки на релизы,\n"
-    "созданные через личный кабинет yourtunēs.\n\n"
-    "Подробнее о том, как её создать, читайте по ссылке: "
-    '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">FAQ</a>\n\n'
-    "<i>Чтобы начать заново, нажмите /start</i>"
+    "⚠️ <b>Не удалось распознать ссылку.</b>\n\n"
+    "Пожалуйста, отправь мультиссылку на релиз одним сообщением.\n\n"
+    "<i>Чтобы начать заново, нажми /start</i>"
+)
+
+CONTEST_CLOSED_TEXT = (
+    "<b>Приём треков завершён.</b>\n\n"
+    "Спасибо всем, кто подал заявки в yourtunēs CONTEST.\n\n"
+    "Результаты отбора будут объявлены 27 апреля.\n"
+    f"Актуальная информация публикуется в канале {CONTEST_CHANNEL}."
 )
 
 
@@ -170,7 +172,6 @@ async def submit_track(call: CallbackQuery, state: FSMContext):
     await call.answer()
     await state.clear()
 
-    # Если приём закрыт — не пускаем в flow
     if CONTEST_CLOSED:
         await call.message.answer(CONTEST_CLOSED_TEXT)
         return
@@ -181,14 +182,14 @@ async def submit_track(call: CallbackQuery, state: FSMContext):
 
 async def choose_league(call: CallbackQuery, state: FSMContext):
     await call.answer()
-    league = call.data.split(":")[1]
+    league_code = call.data.split(":")[1]
 
-    if league == "GENRES":
-        await state.update_data(league="ЛИГА ЖАНРОВ", genre=None)
+    if league_code == "GENRES":
+        await state.update_data(league="ЛИГА ЖАНРОВ", genre="—")
         await state.set_state(SubmitForm.choose_genre)
         await call.message.answer("Выбери жанр", reply_markup=kb_genre())
     else:
-        await state.update_data(league="AI ЛИГА", genre=None)
+        await state.update_data(league="AI ЛИГА", genre="—")
         await state.set_state(SubmitForm.wait_link)
         await call.message.answer(ASK_LINK_TEXT)
 
@@ -202,35 +203,39 @@ async def choose_genre(call: CallbackQuery, state: FSMContext):
 
 
 async def receive_link(message: Message, state: FSMContext):
-    # Если приём закрыт — не принимаем ссылки
     if CONTEST_CLOSED:
         await message.answer(CONTEST_CLOSED_TEXT)
         await state.clear()
         return
 
     if not message.text:
-        await message.answer("Пожалуйста, отправь ссылку текстом одним сообщением.")
+        await message.answer(NOT_OK_TEXT)
         return
 
     url = extract_first_url(message.text)
     if not url:
-        await message.answer("Пришли ссылку одним сообщением (полный URL, начиная с http/https).")
-        return
-
-    if not is_allowed_url(url):
         await message.answer(NOT_OK_TEXT)
         return
 
     data = await state.get_data()
     league = data.get("league", "—")
-    genre = data.get("genre") or "—"
-    username = f"@{message.from_user.username}" if message.from_user.username else "—"
+    genre = data.get("genre", "—")
 
     try:
-        add_to_sheet(league, genre, username, url)
+        add_to_applications_sheet(
+            liga=league,
+            genre=genre,
+            user=message.from_user,
+            link=url,
+            round_number=CURRENT_ROUND,
+        )
         await message.answer(OK_TEXT)
     except Exception as e:
-        await message.answer(f"Ошибка записи в таблицу. Сообщи администратору.\n\nТехнически: {e}")
+        print(f"[ERROR] Failed to write application to sheet: {e}")
+        await message.answer(
+            "Не удалось записать заявку в таблицу. "
+            "Попробуй ещё раз чуть позже или сообщи администратору."
+        )
 
     await state.clear()
 
@@ -248,8 +253,16 @@ async def main():
 
     dp.message.register(cmd_start, CommandStart())
     dp.callback_query.register(submit_track, F.data == "submit_track")
-    dp.callback_query.register(choose_league, F.data.startswith("league:"), SubmitForm.choose_league)
-    dp.callback_query.register(choose_genre, F.data.startswith("genre:"), SubmitForm.choose_genre)
+    dp.callback_query.register(
+        choose_league,
+        F.data.startswith("league:"),
+        SubmitForm.choose_league,
+    )
+    dp.callback_query.register(
+        choose_genre,
+        F.data.startswith("genre:"),
+        SubmitForm.choose_genre,
+    )
     dp.message.register(receive_link, SubmitForm.wait_link)
 
     await dp.start_polling(bot)
