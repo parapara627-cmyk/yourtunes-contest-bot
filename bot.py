@@ -306,8 +306,14 @@ OK_TEXT = (
     "<b>✅ Заявка принята.</b>\n\n"
     "Трек отправлен на модерацию.\n"
     "Результаты отбора будут опубликованы 27 апреля.\n\n"
-    f"Следите за обновлениями в канале {CONTEST_CHANNEL}.\n\n"
-    "<i>Чтобы начать заново, напишите /start</i>"
+    f"Следите за обновлениями в канале {CONTEST_CHANNEL}."
+)
+
+ROUND2_OK_TEXT = (
+    "<b>✅ Заявка принята.</b>\n\n"
+    "Трек отправлен на модерацию.\n"
+    "Результаты второго этапа будут опубликованы 13 мая.\n\n"
+    f"Следите за обновлениями в канале {CONTEST_CHANNEL}."
 )
 
 NOT_OK_TEXT = (
@@ -336,7 +342,8 @@ ROUND2_TEXT = (
     "<b>Поздравляем! Ты прошёл во второй этап yourtunēs CONTEST.</b>\n\n"
     "Второй этап — конкурсный.\n"
     f'Тема раунда уже опубликована в канале <a href="https://t.me/contest_by_yourtunes">{CONTEST_CHANNEL}</a>.\n\n'
-    "У тебя есть 8 дней, чтобы записать и выпустить новый трек через сервис дистрибуции yourtunēs.\n\n"
+    "У тебя есть 8 дней, чтобы записать и выпустить новый трек через сервис дистрибуции "
+    '<a href="https://yourtunes.net">yourtunēs</a>.\n\n'
     "<b>Важно!</b> Трек должен выйти на стриминговых площадках до 6 мая включительно."
 )
 
@@ -468,7 +475,12 @@ async def receive_link(message: Message, state: FSMContext):
             link=url,
             round_number=round_number,
         )
-        await message.answer(OK_TEXT)
+
+        if round_number == 2:
+            await message.answer(ROUND2_OK_TEXT)
+        else:
+            await message.answer(OK_TEXT)
+
     except Exception as e:
         print(f"[ERROR] Failed to write application to sheet '{target_sheet}': {e}")
         await message.answer(
