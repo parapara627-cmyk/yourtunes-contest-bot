@@ -52,7 +52,7 @@ ROUND2_APPLICATIONS_SHEET = "Заявки_2"
 # =========================
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
-ALLOWED_DOMAINS = {
+ROUND1_ALLOWED_DOMAINS = {
     "yourtunes.net",
     "www.yourtunes.net",
     "band.link",
@@ -65,18 +65,33 @@ ALLOWED_DOMAINS = {
     "www.zvonko.link",
 }
 
+ROUND2_ALLOWED_DOMAINS = {
+    "yourtunes.net",
+    "www.yourtunes.net",
+}
+
 
 def extract_first_url(text: str):
     m = URL_RE.search(text or "")
     return m.group(0) if m else None
 
 
-def is_allowed_url(url: str) -> bool:
+def get_host(url: str) -> str:
     try:
-        host = urlparse(url).netloc.lower().split(":")[0]
-        return host in ALLOWED_DOMAINS
+        return urlparse(url).netloc.lower().split(":")[0]
     except Exception:
+        return ""
+
+
+def is_allowed_url_for_round(url: str, round_number: int) -> bool:
+    host = get_host(url)
+    if not host:
         return False
+
+    if round_number == 2:
+        return host in ROUND2_ALLOWED_DOMAINS
+
+    return host in ROUND1_ALLOWED_DOMAINS
 
 
 # =========================
@@ -140,7 +155,7 @@ def get_application_sheet_for_round(round_number: int) -> str:
 
 def find_round2_invite_by_user_id(user_id: int):
     """
-    Ожидаем round2_invites со структурой:
+    round2_invites:
     date | league | genre | username | link | user_id | chat_id | full_name | round | status | comment | notify_status | notify_error
     """
     sheet = get_worksheet(ROUND2_INVITES_SHEET)
@@ -281,8 +296,10 @@ ASK_LINK_TEXT = (
 )
 
 ROUND2_ASK_LINK_TEXT = (
-    "Отправь мультиссылку на релиз одним сообщением.\n\n"
-    "Это заявка для второго раунда."
+    "Для участия во втором этапе отправь мультиссылку на релиз, "
+    "созданную в личном кабинете yourtunēs.\n\n"
+    "Подробнее о том, как создать мультиссылку, читайте "
+    '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">здесь</a>.'
 )
 
 OK_TEXT = (
@@ -300,6 +317,14 @@ NOT_OK_TEXT = (
     "<i>Попробуй ещё раз или нажми /start</i>"
 )
 
+ROUND2_NOT_OK_TEXT = (
+    "⚠️ <b>Эта ссылка не подходит.</b>\n\n"
+    "Для второго этапа нужно отправить мультиссылку на релиз, "
+    "созданную в личном кабинете yourtunēs.\n\n"
+    "Подробнее о том, как создать мультиссылку, читайте "
+    '<a href="https://yourtunes.net/news/kak-sdelat-multissylku-reliza-na-servise-yourtunes">здесь</a>.'
+)
+
 CONTEST_CLOSED_TEXT = (
     "<b>Приём треков завершён.</b>\n\n"
     "Спасибо всем, кто подал заявки в yourtunēs CONTEST.\n\n"
@@ -308,9 +333,11 @@ CONTEST_CLOSED_TEXT = (
 )
 
 ROUND2_TEXT = (
-    "<b>Ты прошёл во второй этап yourtunēs CONTEST.</b>\n\n"
-    "Поздравляем!\n"
-    "Чтобы подать трек во второй раунд, нажми кнопку ниже."
+    "<b>Поздравляем! Ты прошёл во второй этап yourtunēs CONTEST.</b>\n\n"
+    "Второй этап — конкурсный.\n"
+    f'Тема раунда уже опубликована в канале <a href="https://t.me/contest_by_yourtunes">{CONTEST_CHANNEL}</a>.\n\n'
+    "У тебя есть 8 дней, чтобы записать и выпустить новый трек через сервис дистрибуции yourtunēs.\n\n"
+    "<b>Важно!</b> Трек должен выйти на стриминговых площадках до 6 мая включительно."
 )
 
 ROUND2_DENIED_TEXT = (
@@ -418,14 +445,17 @@ async def receive_link(message: Message, state: FSMContext):
         await message.answer(NOT_OK_TEXT)
         return
 
-    if not is_allowed_url(url):
-        await message.answer(NOT_OK_TEXT)
-        return
-
     data = await state.get_data()
     league = data.get("league", "—")
     genre = data.get("genre", "—")
     round_number = int(data.get("round", CURRENT_ROUND))
+
+    if not is_allowed_url_for_round(url, round_number):
+        if round_number == 2:
+            await message.answer(ROUND2_NOT_OK_TEXT)
+        else:
+            await message.answer(NOT_OK_TEXT)
+        return
 
     target_sheet = get_application_sheet_for_round(round_number)
 
