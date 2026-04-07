@@ -44,6 +44,7 @@ ADMIN_IDS = {
 
 APPLICATIONS_SHEET = "Заявки"
 ROUND2_INVITES_SHEET = "round2_invites"
+ROUND2_APPLICATIONS_SHEET = "Заявки_2"
 
 
 # =========================
@@ -101,14 +102,15 @@ def get_worksheet(sheet_title: str):
     return spreadsheet.worksheet(sheet_title)
 
 
-def add_to_applications_sheet(
+def add_application_row(
+    sheet_title: str,
     liga: str,
     genre: str,
     user,
     link: str,
     round_number: int,
 ):
-    sheet = get_worksheet(APPLICATIONS_SHEET)
+    sheet = get_worksheet(sheet_title)
 
     username = f"@{user.username}" if user.username else "—"
     full_name = user.full_name or "—"
@@ -130,10 +132,16 @@ def add_to_applications_sheet(
     ])
 
 
+def get_application_sheet_for_round(round_number: int) -> str:
+    if round_number == 2:
+        return ROUND2_APPLICATIONS_SHEET
+    return APPLICATIONS_SHEET
+
+
 def find_round2_invite_by_user_id(user_id: int):
     """
-    Ожидаем лист round2_invites с колонками:
-    user_id | chat_id | username | full_name | league | genre | notify_status | notify_error
+    Ожидаем round2_invites со структурой:
+    date | league | genre | username | link | user_id | chat_id | full_name | round | status | comment | notify_status | notify_error
     """
     sheet = get_worksheet(ROUND2_INVITES_SHEET)
     rows = sheet.get_all_values()
@@ -142,18 +150,23 @@ def find_round2_invite_by_user_id(user_id: int):
         return None
 
     for row_index, row in enumerate(rows[1:], start=2):
-        row_user_id = row[0].strip() if len(row) > 0 else ""
+        row_user_id = row[5].strip() if len(row) > 5 else ""
         if row_user_id == str(user_id):
             return {
                 "row_index": row_index,
-                "user_id": row[0] if len(row) > 0 else "",
-                "chat_id": row[1] if len(row) > 1 else "",
-                "username": row[2] if len(row) > 2 else "",
-                "full_name": row[3] if len(row) > 3 else "",
-                "league": row[4] if len(row) > 4 else "—",
-                "genre": row[5] if len(row) > 5 else "—",
-                "notify_status": row[6] if len(row) > 6 else "",
-                "notify_error": row[7] if len(row) > 7 else "",
+                "date": row[0] if len(row) > 0 else "",
+                "league": row[1] if len(row) > 1 else "—",
+                "genre": row[2] if len(row) > 2 else "—",
+                "username": row[3] if len(row) > 3 else "",
+                "link": row[4] if len(row) > 4 else "",
+                "user_id": row[5] if len(row) > 5 else "",
+                "chat_id": row[6] if len(row) > 6 else "",
+                "full_name": row[7] if len(row) > 7 else "",
+                "round": row[8] if len(row) > 8 else "",
+                "status": row[9] if len(row) > 9 else "",
+                "comment": row[10] if len(row) > 10 else "",
+                "notify_status": row[11] if len(row) > 11 else "",
+                "notify_error": row[12] if len(row) > 12 else "",
             }
 
     return None
@@ -170,14 +183,19 @@ def get_round2_invites_rows():
     for row_index, row in enumerate(rows[1:], start=2):
         result.append({
             "row_index": row_index,
-            "user_id": row[0].strip() if len(row) > 0 else "",
-            "chat_id": row[1].strip() if len(row) > 1 else "",
-            "username": row[2].strip() if len(row) > 2 else "",
-            "full_name": row[3].strip() if len(row) > 3 else "",
-            "league": row[4].strip() if len(row) > 4 else "—",
-            "genre": row[5].strip() if len(row) > 5 else "—",
-            "notify_status": row[6].strip() if len(row) > 6 else "",
-            "notify_error": row[7].strip() if len(row) > 7 else "",
+            "date": row[0].strip() if len(row) > 0 else "",
+            "league": row[1].strip() if len(row) > 1 else "—",
+            "genre": row[2].strip() if len(row) > 2 else "—",
+            "username": row[3].strip() if len(row) > 3 else "",
+            "link": row[4].strip() if len(row) > 4 else "",
+            "user_id": row[5].strip() if len(row) > 5 else "",
+            "chat_id": row[6].strip() if len(row) > 6 else "",
+            "full_name": row[7].strip() if len(row) > 7 else "",
+            "round": row[8].strip() if len(row) > 8 else "",
+            "status": row[9].strip() if len(row) > 9 else "",
+            "comment": row[10].strip() if len(row) > 10 else "",
+            "notify_status": row[11].strip() if len(row) > 11 else "",
+            "notify_error": row[12].strip() if len(row) > 12 else "",
         })
 
     return result
@@ -185,12 +203,13 @@ def get_round2_invites_rows():
 
 def update_round2_notify_result(row_index: int, status: str, error_text: str = ""):
     """
-    notify_status = колонка G (7)
-    notify_error  = колонка H (8)
+    round2_invites:
+    notify_status = колонка L (12)
+    notify_error  = колонка M (13)
     """
     sheet = get_worksheet(ROUND2_INVITES_SHEET)
-    sheet.update_cell(row_index, 7, status)
-    sheet.update_cell(row_index, 8, error_text)
+    sheet.update_cell(row_index, 12, status)
+    sheet.update_cell(row_index, 13, error_text)
 
 
 # =========================
@@ -259,6 +278,11 @@ ASK_LINK_TEXT = (
     "— принимаются только мультиссылки на релиз\n"
     "— все заявки проходят модерацию перед отбором\n\n"
     "Если ссылка не соответствует условиям конкурса, заявка не будет допущена."
+)
+
+ROUND2_ASK_LINK_TEXT = (
+    "Отправь мультиссылку на релиз одним сообщением.\n\n"
+    "Это заявка для второго раунда."
 )
 
 OK_TEXT = (
@@ -376,10 +400,7 @@ async def submit_round2(call: CallbackQuery, state: FSMContext):
         genre=invite["genre"] or "—",
     )
     await state.set_state(SubmitForm.wait_link)
-    await call.message.answer(
-        "Отправь мультиссылку на релиз одним сообщением.\n\n"
-        "Это заявка для второго раунда."
-    )
+    await call.message.answer(ROUND2_ASK_LINK_TEXT)
 
 
 async def receive_link(message: Message, state: FSMContext):
@@ -406,8 +427,11 @@ async def receive_link(message: Message, state: FSMContext):
     genre = data.get("genre", "—")
     round_number = int(data.get("round", CURRENT_ROUND))
 
+    target_sheet = get_application_sheet_for_round(round_number)
+
     try:
-        add_to_applications_sheet(
+        add_application_row(
+            sheet_title=target_sheet,
             liga=league,
             genre=genre,
             user=message.from_user,
@@ -416,7 +440,7 @@ async def receive_link(message: Message, state: FSMContext):
         )
         await message.answer(OK_TEXT)
     except Exception as e:
-        print(f"[ERROR] Failed to write application to sheet: {e}")
+        print(f"[ERROR] Failed to write application to sheet '{target_sheet}': {e}")
         await message.answer(
             "Не удалось записать заявку в таблицу. "
             "Попробуй ещё раз чуть позже или сообщи администратору."
