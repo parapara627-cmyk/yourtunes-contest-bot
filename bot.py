@@ -64,6 +64,8 @@ ROUND1_ALLOWED_DOMAINS = {
     "www.lnk.to",
     "zvonko.link",
     "www.zvonko.link",
+    "onerpm.link",
+    "www.onerpm.link",
 }
 
 ROUND2_ALLOWED_DOMAINS = {
