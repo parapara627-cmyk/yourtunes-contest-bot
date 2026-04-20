@@ -409,6 +409,11 @@ def is_admin(user_id: int) -> bool:
 # =========================
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
+
+    if CONTEST_CLOSED:
+        await message.answer(CONTEST_CLOSED_TEXT)
+        return
+
     await message.answer(START_TEXT, reply_markup=kb_start())
 
 
