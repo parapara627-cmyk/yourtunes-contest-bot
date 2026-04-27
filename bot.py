@@ -132,7 +132,6 @@ def add_application_row(
 
     username = f"@{user.username}" if user.username else "—"
     full_name = user.full_name or "—"
-
     status = "submitted" if round_number == 1 else "submitted_r2"
 
     sheet.append_row([
@@ -157,10 +156,6 @@ def get_application_sheet_for_round(round_number: int) -> str:
 
 
 def find_invite_by_user_id(sheet_title: str, user_id: int):
-    """
-    Универсально для round2_invites и round3_invites:
-    date | league | genre | username | link | user_id | chat_id | full_name | round | status | comment | notify_status | notify_error
-    """
     sheet = get_worksheet(sheet_title)
     rows = sheet.get_all_values()
 
@@ -169,6 +164,7 @@ def find_invite_by_user_id(sheet_title: str, user_id: int):
 
     for row_index, row in enumerate(rows[1:], start=2):
         row_user_id = row[5].strip() if len(row) > 5 else ""
+
         if row_user_id == str(user_id):
             return {
                 "row_index": row_index,
@@ -198,6 +194,7 @@ def get_invite_rows(sheet_title: str):
         return []
 
     result = []
+
     for row_index, row in enumerate(rows[1:], start=2):
         result.append({
             "row_index": row_index,
@@ -220,13 +217,9 @@ def get_invite_rows(sheet_title: str):
 
 
 def update_notify_result(sheet_title: str, row_index: int, status: str, error_text: str = ""):
-    """
-    notify_status = колонка L (12)
-    notify_error  = колонка M (13)
-    """
     sheet = get_worksheet(sheet_title)
-    sheet.update_cell(row_index, 12, status)
-    sheet.update_cell(row_index, 13, error_text)
+    sheet.update_cell(row_index, 12, status)      # notify_status
+    sheet.update_cell(row_index, 13, error_text)  # notify_error
 
 
 # =========================
@@ -480,18 +473,22 @@ async def receive_link(message: Message, state: FSMContext):
         return
 
     if not message.text:
-        await message.answer(NOT_OK_TEXT)
+        if round_number == 2:
+            await message.answer(ROUND2_NOT_OK_TEXT)
+        else:
+            await message.answer(NOT_OK_TEXT)
         return
 
     url = extract_first_url(message.text)
     if not url:
-        await message.answer(NOT_OK_TEXT)
+        if round_number == 2:
+            await message.answer(ROUND2_NOT_OK_TEXT)
+        else:
+            await message.answer(NOT_OK_TEXT)
         return
 
-    data = await state.get_data()
     league = data.get("league", "—")
     genre = data.get("genre", "—")
-    round_number = int(data.get("round", CURRENT_ROUND))
 
     if not is_allowed_url_for_round(url, round_number):
         if round_number == 2:
