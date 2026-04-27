@@ -71,6 +71,10 @@ ROUND1_ALLOWED_DOMAINS = {
 ROUND2_ALLOWED_DOMAINS = {
     "yourtunes.net",
     "www.yourtunes.net",
+    "band.link",
+    "www.band.link",
+    "bandlink.to",
+    "www.bandlink.to",
 }
 
 
