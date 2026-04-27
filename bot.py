@@ -471,7 +471,10 @@ async def submit_round2(call: CallbackQuery, state: FSMContext):
 
 
 async def receive_link(message: Message, state: FSMContext):
-    if CONTEST_CLOSED:
+    data = await state.get_data()
+    round_number = int(data.get("round", CURRENT_ROUND))
+
+    if CONTEST_CLOSED and round_number == 1:
         await message.answer(CONTEST_CLOSED_TEXT)
         await state.clear()
         return
